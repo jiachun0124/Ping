@@ -52,6 +52,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  updateEvent: (eventId, payload) =>
+    request(`/events/${eventId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    }),
+  deleteEvent: (eventId) => request(`/events/${eventId}`, { method: "DELETE" }),
   setGoing: (eventId) => request(`/events/${eventId}/going`, { method: "POST" }),
   unsetGoing: (eventId) =>
     request(`/events/${eventId}/going`, { method: "DELETE" }),

@@ -31,15 +31,19 @@ router.post("/", requireAuth, requireVerified, async (req, res, next) => {
   const {
     title,
     description,
-    mood,
-    intention,
+    category,
     place_name,
     lat,
     lng,
     max_participants
   } = req.body;
-  if (!title || !place_name || lat == null || lng == null) {
-    return res.status(400).json({ error: "title, place_name, lat, lng are required" });
+  if (!title || !place_name || !category || lat == null || lng == null) {
+    return res
+      .status(400)
+      .json({ error: "title, category, place_name, lat, lng are required" });
+  }
+  if (!["sport", "art", "social", "study"].includes(category)) {
+    return res.status(400).json({ error: "category must be sport, art, social, or study" });
   }
   try {
     const now = new Date();
@@ -47,8 +51,7 @@ router.post("/", requireAuth, requireVerified, async (req, res, next) => {
       creator_uid: req.user.uid,
       title,
       description,
-      mood,
-      intention,
+      category,
       place_name,
       lat,
       lng,
@@ -63,6 +66,7 @@ router.post("/", requireAuth, requireVerified, async (req, res, next) => {
       creator_uid: event.creator_uid.toString(),
       title: event.title,
       description: event.description,
+      category: event.category,
       start_time: event.start_time,
       end_time: event.end_time,
       status: event.status,
@@ -89,8 +93,7 @@ router.get("/:event_id", async (req, res, next) => {
       creator_uid: event.creator_uid.toString(),
       title: event.title,
       description: event.description,
-      mood: event.mood,
-      intention: event.intention,
+      category: event.category,
       start_time: event.start_time,
       end_time: event.end_time,
       status: event.status,
@@ -145,6 +148,75 @@ router.post("/:event_id/activate", requireAuth, requireVerified, async (req, res
       start_time: event.start_time,
       end_time: event.end_time
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/:event_id", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  const { title, description, category, place_name, lat, lng, max_participants } = req.body;
+  if (!title || !category || !place_name || lat == null || lng == null) {
+    return res
+      .status(400)
+      .json({ error: "title, category, place_name, lat, lng are required" });
+  }
+  if (!["sport", "art", "social", "study"].includes(category)) {
+    return res.status(400).json({ error: "category must be sport, art, social, or study" });
+  }
+  try {
+    const event = await Event.findOneAndUpdate(
+      { _id: event_id, creator_uid: req.user.uid },
+      {
+        title,
+        description,
+        category,
+        place_name,
+        lat,
+        lng,
+        location: { type: "Point", coordinates: [lng, lat] },
+        max_participants
+      },
+      { new: true }
+    ).lean();
+    if (!event) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    return res.json({
+      event_id: event._id.toString(),
+      creator_uid: event.creator_uid.toString(),
+      title: event.title,
+      description: event.description,
+      category: event.category,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      status: event.status,
+      place_name: event.place_name,
+      lat: event.lat,
+      lng: event.lng,
+      max_participants: event.max_participants
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/:event_id", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    const event = await Event.findOneAndDelete({
+      _id: event_id,
+      creator_uid: req.user.uid
+    }).lean();
+    if (!event) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    await Promise.all([
+      EventJoin.deleteMany({ event_id }),
+      EventLike.deleteMany({ event_id }),
+      EventComment.deleteMany({ event_id })
+    ]);
+    return res.json({ event_id, deleted: true });
   } catch (error) {
     return next(error);
   }

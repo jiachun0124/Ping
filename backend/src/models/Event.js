@@ -5,8 +5,11 @@ const eventSchema = new mongoose.Schema(
     creator_uid: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true },
     description: String,
-    mood: String,
-    intention: String,
+    category: {
+      type: String,
+      enum: ["sport", "art", "social", "study"],
+      required: true
+    },
     place_name: { type: String, required: true },
     lat: { type: Number, required: true },
     lng: { type: Number, required: true },

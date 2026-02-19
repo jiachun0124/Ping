@@ -37,7 +37,7 @@ router.get("/points", requireAuth, async (req, res, next) => {
         }
       }
     })
-      .select("title mood start_time end_time status lat lng")
+      .select("title category start_time end_time status lat lng")
       .sort({ start_time: -1 })
       .limit(500)
       .lean();
@@ -49,7 +49,7 @@ router.get("/points", requireAuth, async (req, res, next) => {
         lat: row.lat,
         lng: row.lng,
         title: row.title,
-        mood: row.mood,
+        mood: row.category,
         start_time: row.start_time,
         ttl_minutes: Math.max(
           0,
