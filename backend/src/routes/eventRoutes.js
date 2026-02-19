@@ -1,0 +1,286 @@
+const express = require("express");
+const Event = require("../models/Event");
+const EventJoin = require("../models/EventJoin");
+const EventLike = require("../models/EventLike");
+const EventComment = require("../models/EventComment");
+const { requireAuth, requireVerified } = require("../middleware/auth");
+
+const router = express.Router();
+
+const getCounts = async (eventId) => {
+  const [going, interested, comments] = await Promise.all([
+    EventJoin.countDocuments({ event_id: eventId }),
+    EventLike.countDocuments({ event_id: eventId }),
+    EventComment.countDocuments({ event_id: eventId })
+  ]);
+  return { going, interested, comments };
+};
+
+const getViewerState = async (eventId, userId) => {
+  if (!userId) {
+    return { going: false, interested: false };
+  }
+  const [going, interested] = await Promise.all([
+    EventJoin.exists({ event_id: eventId, uid: userId }),
+    EventLike.exists({ event_id: eventId, uid: userId })
+  ]);
+  return { going: Boolean(going), interested: Boolean(interested) };
+};
+
+router.post("/", requireAuth, requireVerified, async (req, res, next) => {
+  const {
+    title,
+    description,
+    mood,
+    intention,
+    place_name,
+    lat,
+    lng,
+    max_participants
+  } = req.body;
+  if (!title || !place_name || lat == null || lng == null) {
+    return res.status(400).json({ error: "title, place_name, lat, lng are required" });
+  }
+  try {
+    const now = new Date();
+    const event = await Event.create({
+      creator_uid: req.user.uid,
+      title,
+      description,
+      mood,
+      intention,
+      place_name,
+      lat,
+      lng,
+      location: { type: "Point", coordinates: [lng, lat] },
+      max_participants,
+      start_time: now,
+      end_time: new Date(now.getTime() + 2 * 60 * 60 * 1000),
+      status: "active"
+    });
+    return res.json({
+      event_id: event._id.toString(),
+      creator_uid: event.creator_uid.toString(),
+      title: event.title,
+      description: event.description,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      status: event.status,
+      place_name: event.place_name,
+      lat: event.lat,
+      lng: event.lng
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/:event_id", async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    const event = await Event.findById(event_id).lean();
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    const counts = await getCounts(event_id);
+    const viewerState = await getViewerState(event_id, req.session?.userId);
+    return res.json({
+      event_id: event._id.toString(),
+      creator_uid: event.creator_uid.toString(),
+      title: event.title,
+      description: event.description,
+      mood: event.mood,
+      intention: event.intention,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      status: event.status,
+      place_name: event.place_name,
+      lat: event.lat,
+      lng: event.lng,
+      max_participants: event.max_participants,
+      counts,
+      viewer_state: viewerState
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/:event_id/deactivate", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    const event = await Event.findOneAndUpdate(
+      { _id: event_id, creator_uid: req.user.uid },
+      { status: "ended", end_time: new Date() },
+      { new: true }
+    ).lean();
+    if (!event) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    return res.json({
+      event_id: event._id.toString(),
+      status: event.status,
+      end_time: event.end_time
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/:event_id/activate", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    const now = new Date();
+    const event = await Event.findOneAndUpdate(
+      { _id: event_id, creator_uid: req.user.uid },
+      { status: "active", start_time: now, end_time: new Date(now.getTime() + 2 * 60 * 60 * 1000) },
+      { new: true }
+    ).lean();
+    if (!event) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    return res.json({
+      event_id: event._id.toString(),
+      status: event.status,
+      start_time: event.start_time,
+      end_time: event.end_time
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/:event_id/going", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    await EventJoin.updateOne(
+      { event_id, uid: req.user.uid },
+      { $setOnInsert: { event_id, uid: req.user.uid, joined_at: new Date() } },
+      { upsert: true }
+    );
+    const counts = await getCounts(event_id);
+    return res.json({ event_id, going: true, going_count: counts.going });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/:event_id/going", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    await EventJoin.deleteOne({ event_id, uid: req.user.uid });
+    const counts = await getCounts(event_id);
+    return res.json({ event_id, going: false, going_count: counts.going });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/:event_id/interested", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    await EventLike.updateOne(
+      { event_id, uid: req.user.uid },
+      { $setOnInsert: { event_id, uid: req.user.uid, liked_at: new Date() } },
+      { upsert: true }
+    );
+    const counts = await getCounts(event_id);
+    return res.json({
+      event_id,
+      interested: true,
+      interested_count: counts.interested
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/:event_id/interested", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    await EventLike.deleteOne({ event_id, uid: req.user.uid });
+    const counts = await getCounts(event_id);
+    return res.json({
+      event_id,
+      interested: false,
+      interested_count: counts.interested
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/:event_id/comments", async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    const items = await EventComment.find({
+      event_id,
+      parent_comment_id: null
+    })
+      .sort({ created_at: -1 })
+      .limit(50)
+      .lean();
+    const mapped = items.map((comment) => ({
+      comment_id: comment._id.toString(),
+      event_id: comment.event_id.toString(),
+      uid: comment.uid.toString(),
+      body: comment.body,
+      created_at: comment.created_at
+    }));
+    return res.json({ items: mapped, next_cursor: null });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/:event_id/comments", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  const { body } = req.body;
+  if (!body) {
+    return res.status(400).json({ error: "body is required" });
+  }
+  try {
+    const comment = await EventComment.create({
+      event_id,
+      uid: req.user.uid,
+      body
+    });
+    return res.json({
+      comment_id: comment._id.toString(),
+      event_id: comment.event_id.toString(),
+      uid: comment.uid.toString(),
+      body: comment.body,
+      created_at: comment.created_at
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get(
+  "/:event_id/comments/:comment_id/replies",
+  async (req, res, next) => {
+    const { event_id, comment_id } = req.params;
+    try {
+      const items = await EventComment.find({
+        event_id,
+        parent_comment_id: comment_id
+      })
+        .sort({ created_at: 1 })
+        .lean();
+      const mapped = items.map((comment) => ({
+        comment_id: comment._id.toString(),
+        event_id: comment.event_id.toString(),
+        parent_comment_id: comment.parent_comment_id.toString(),
+        uid: comment.uid.toString(),
+        body: comment.body,
+        created_at: comment.created_at
+      }));
+      return res.json({ items: mapped, next_cursor: null });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+module.exports = router;
