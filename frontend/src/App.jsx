@@ -40,19 +40,11 @@ const App = () => {
         />
         <Route
           path="/map"
-          element={
-            <ProtectedRoute>
-              <MapPage />
-            </ProtectedRoute>
-          }
+          element={<MapPage />}
         />
         <Route
           path="/events/:eventId"
-          element={
-            <ProtectedRoute>
-              <EventPage />
-            </ProtectedRoute>
-          }
+          element={<EventPage />}
         />
         <Route
           path="/events/new"

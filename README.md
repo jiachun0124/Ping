@@ -38,3 +38,43 @@ Open `http://localhost:5173`.
 ## Notes
 - Dev login is enabled via `/auth/dev`. Use a `.edu` email to be verified.
 - Google OAuth routes are stubbed for now.
+
+## Deploy (Public Web App)
+Recommended setup:
+- Frontend: Vercel
+- Backend API: Render (or Railway)
+- Database: MongoDB Atlas
+
+### 1) Deploy backend API
+Create a Web Service from `backend/` with:
+- Build command: `npm install`
+- Start command: `npm start`
+
+Set environment variables:
+- `NODE_ENV=production`
+- `PORT=4000`
+- `MONGODB_URI=<your mongodb atlas uri>`
+- `SESSION_SECRET=<strong random secret>`
+- `ALLOWED_ORIGINS=https://<your-frontend-domain>`
+- `FRONTEND_URL=https://<your-frontend-domain>`
+- `HOST=0.0.0.0`
+- (optional) Google OAuth values if used:
+  - `GOOGLE_CLIENT_ID`
+  - `GOOGLE_CLIENT_SECRET`
+  - `GOOGLE_CALLBACK_URL=https://<your-backend-domain>/auth/google/callback`
+
+After deploy, verify `https://<your-backend-domain>/health` returns `{ "ok": true }`.
+
+### 2) Deploy frontend
+Deploy `frontend/` with:
+- Build command: `npm run build`
+- Output directory: `dist`
+
+Set environment variables:
+- `VITE_API_BASE_URL=https://<your-backend-domain>`
+- `VITE_GOOGLE_MAPS_API_KEY=<your maps browser key>`
+
+### 3) Make it public
+- Use your frontend production URL as the public site.
+- Ensure backend `ALLOWED_ORIGINS` includes that exact URL.
+- If you update domains, redeploy both sides with matching env vars.

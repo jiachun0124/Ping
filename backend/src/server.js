@@ -14,6 +14,10 @@ const mapRoutes = require("./routes/mapRoutes");
 
 const app = express();
 
+if (config.isProduction) {
+  app.set("trust proxy", 1);
+}
+
 app.use(
   cors({
     origin: config.allowedOrigins,
@@ -32,7 +36,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false
+      secure: config.isProduction
     }
   })
 );

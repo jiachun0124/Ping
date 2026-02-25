@@ -36,7 +36,7 @@ const MapPage = () => {
         max_points: 120
       };
       const pointsResponse = await api.mapPoints(bounds);
-      setPoints(pointsResponse.points || []);
+      const mapPoints = pointsResponse.points || [];
 
       const discoverResponse = await api.discover({
         lat: userLocation.lat,
@@ -44,7 +44,21 @@ const MapPage = () => {
         radius_m: Math.round(filters.radiusMiles * 1609.34),
         limit: 10
       });
-      setEvents(discoverResponse.items || []);
+      const discoveredItems = discoverResponse.items || [];
+      setEvents(discoveredItems);
+      if (mapPoints.length === 0 && discoveredItems.length > 0) {
+        setPoints(
+          discoveredItems.map((item) => ({
+            id: item.event_id,
+            type: "event",
+            lat: item.lat,
+            lng: item.lng,
+            title: item.title
+          }))
+        );
+      } else {
+        setPoints(mapPoints);
+      }
       setStatus("");
     } catch (error) {
       setStatus(error.message);
@@ -230,7 +244,7 @@ const MapPage = () => {
                     onClick={() => navigate(`/events/${selectedEvent.event_id}`)}
                     className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600"
                   >
-                    Open page
+                    Details
                   </button>
                 </div>
               </>

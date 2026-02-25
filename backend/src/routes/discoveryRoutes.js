@@ -1,8 +1,6 @@
 const express = require("express");
 const Event = require("../models/Event");
 const EventJoin = require("../models/EventJoin");
-const { requireAuth } = require("../middleware/auth");
-
 const router = express.Router();
 
 const parseFloatParam = (value) => {
@@ -11,7 +9,7 @@ const parseFloatParam = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-router.get("/", requireAuth, async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   const lat = parseFloatParam(req.query.lat);
   const lng = parseFloatParam(req.query.lng);
   const radiusM = parseFloatParam(req.query.radius_m) || 20000;

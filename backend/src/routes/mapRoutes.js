@@ -1,7 +1,5 @@
 const express = require("express");
 const Event = require("../models/Event");
-const { requireAuth } = require("../middleware/auth");
-
 const router = express.Router();
 
 const parseFloatParam = (value) => {
@@ -13,7 +11,7 @@ const parseFloatParam = (value) => {
 const gridKey = (lat, lng, size) =>
   `${Math.floor(lat / size) * size}_${Math.floor(lng / size) * size}`;
 
-router.get("/points", requireAuth, async (req, res, next) => {
+router.get("/points", async (req, res, next) => {
   const north = parseFloatParam(req.query.north);
   const south = parseFloatParam(req.query.south);
   const east = parseFloatParam(req.query.east);

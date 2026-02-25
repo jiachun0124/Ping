@@ -19,12 +19,16 @@ const TopNav = () => {
   return (
     <header className="bg-white border-b border-slate-200">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate("/map")}
+          className="flex items-center gap-2"
+        >
           <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-semibold">
             P
           </div>
           <span className="font-semibold text-lg">Ping</span>
-        </div>
+        </button>
         {user && (
           <nav className="flex items-center gap-4 text-sm">
             <NavLink
