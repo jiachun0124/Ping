@@ -6,6 +6,7 @@ const EventComment = require("../models/EventComment");
 const { requireAuth, requireVerified } = require("../middleware/auth");
 
 const router = express.Router();
+const EVENT_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const getCounts = async (eventId) => {
   const [going, interested, comments] = await Promise.all([
@@ -58,7 +59,7 @@ router.post("/", requireAuth, requireVerified, async (req, res, next) => {
       location: { type: "Point", coordinates: [lng, lat] },
       max_participants,
       start_time: now,
-      end_time: new Date(now.getTime() + 2 * 60 * 60 * 1000),
+      end_time: new Date(now.getTime() + EVENT_DURATION_MS),
       status: "active"
     });
     return res.json({
@@ -136,7 +137,7 @@ router.post("/:event_id/activate", requireAuth, requireVerified, async (req, res
     const now = new Date();
     const event = await Event.findOneAndUpdate(
       { _id: event_id, creator_uid: req.user.uid },
-      { status: "active", start_time: now, end_time: new Date(now.getTime() + 2 * 60 * 60 * 1000) },
+      { status: "active", start_time: now, end_time: new Date(now.getTime() + EVENT_DURATION_MS) },
       { new: true }
     ).lean();
     if (!event) {
