@@ -29,41 +29,52 @@ const TopNav = () => {
           </div>
           <span className="font-semibold text-lg">Ping</span>
         </button>
-        {user && (
-          <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex items-center gap-4 text-sm">
+          <NavLink
+            to="/map"
+            className={({ isActive }) =>
+              isActive ? "text-indigo-600 font-semibold" : "text-slate-600"
+            }
+          >
+            Map
+          </NavLink>
+          {user ? (
+            <>
+              <NavLink
+                to="/saved"
+                className={({ isActive }) =>
+                  isActive ? "text-indigo-600 font-semibold" : "text-slate-600"
+                }
+              >
+                Saved
+              </NavLink>
+              <NavLink
+                to="/profile"
+                className={({ isActive }) =>
+                  isActive ? "text-indigo-600 font-semibold" : "text-slate-600"
+                }
+              >
+                Profile
+              </NavLink>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-slate-600 hover:text-slate-900"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
             <NavLink
-              to="/map"
+              to="/login"
               className={({ isActive }) =>
                 isActive ? "text-indigo-600 font-semibold" : "text-slate-600"
               }
             >
-              Map
+              Log in
             </NavLink>
-            <NavLink
-              to="/saved"
-              className={({ isActive }) =>
-                isActive ? "text-indigo-600 font-semibold" : "text-slate-600"
-              }
-            >
-              Saved
-            </NavLink>
-            <NavLink
-              to="/profile"
-              className={({ isActive }) =>
-                isActive ? "text-indigo-600 font-semibold" : "text-slate-600"
-              }
-            >
-              Profile
-            </NavLink>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="text-slate-600 hover:text-slate-900"
-            >
-              Log out
-            </button>
-          </nav>
-        )}
+          )}
+        </nav>
       </div>
     </header>
   );
