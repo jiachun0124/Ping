@@ -6,7 +6,8 @@ const EventComment = require("../models/EventComment");
 const { requireAuth, requireVerified } = require("../middleware/auth");
 
 const router = express.Router();
-const EVENT_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+// Temporary: keep events effectively non-expiring until growth requires stricter TTL.
+const EVENT_DURATION_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 
 const getCounts = async (eventId) => {
   const [going, interested, comments] = await Promise.all([
