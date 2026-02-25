@@ -35,7 +35,9 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
+      // Frontend and backend use different domains in production, so cross-site
+      // session cookies must use SameSite=None (with Secure=true).
+      sameSite: config.isProduction ? "none" : "lax",
       secure: config.isProduction
     }
   })
