@@ -126,24 +126,77 @@ const MapPage = () => {
     setModalStatus("");
   };
 
+  const updateEventCountsInList = (eventId, updates) => {
+    setEvents((prev) =>
+      prev.map((item) => {
+        if (item.event_id !== eventId) return item;
+        return {
+          ...item,
+          counts: {
+            ...(item.counts || {}),
+            ...updates
+          }
+        };
+      })
+    );
+  };
+
   const handleModalGoing = async () => {
     if (!selectedEvent) return;
-    if (selectedEvent.viewer_state?.going) {
-      await api.unsetGoing(selectedEvent.event_id);
-    } else {
-      await api.setGoing(selectedEvent.event_id);
+    try {
+      const response = selectedEvent.viewer_state?.going
+        ? await api.unsetGoing(selectedEvent.event_id)
+        : await api.setGoing(selectedEvent.event_id);
+
+      setSelectedEvent((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          counts: {
+            ...(prev.counts || {}),
+            going: response.going_count
+          },
+          viewer_state: {
+            ...(prev.viewer_state || {}),
+            going: response.going
+          }
+        };
+      });
+      updateEventCountsInList(selectedEvent.event_id, { going: response.going_count });
+      setModalStatus("");
+    } catch (error) {
+      setModalStatus(error.message);
     }
-    await openEventModal(selectedEvent.event_id);
   };
 
   const handleModalSave = async () => {
     if (!selectedEvent) return;
-    if (selectedEvent.viewer_state?.interested) {
-      await api.unsetInterested(selectedEvent.event_id);
-    } else {
-      await api.setInterested(selectedEvent.event_id);
+    try {
+      const response = selectedEvent.viewer_state?.interested
+        ? await api.unsetInterested(selectedEvent.event_id)
+        : await api.setInterested(selectedEvent.event_id);
+
+      setSelectedEvent((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          counts: {
+            ...(prev.counts || {}),
+            interested: response.interested_count
+          },
+          viewer_state: {
+            ...(prev.viewer_state || {}),
+            interested: response.interested
+          }
+        };
+      });
+      updateEventCountsInList(selectedEvent.event_id, {
+        interested: response.interested_count
+      });
+      setModalStatus("");
+    } catch (error) {
+      setModalStatus(error.message);
     }
-    await openEventModal(selectedEvent.event_id);
   };
 
   return (
