@@ -414,7 +414,7 @@ const MapPage = () => {
             : "Guest users can browse events."}
         </div>
       </div>
-      <div className="bg-white rounded-2xl border border-slate-200 min-h-[700px] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 h-[700px] overflow-hidden">
         <MapView
           points={points}
           onSelect={handleSelectPoint}
@@ -422,7 +422,7 @@ const MapPage = () => {
           zoom={mapZoom}
         />
       </div>
-      <div className="space-y-4">
+      <div className="space-y-4 h-[700px] flex flex-col min-h-0">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Live events</h2>
           <button
@@ -438,11 +438,13 @@ const MapPage = () => {
             {status}
           </div>
         )}
-        <EventList
-          events={filteredEvents}
-          emptyLabel="No events nearby."
-          onSelect={(eventItem) => openEventModal(eventItem.event_id)}
-        />
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <EventList
+            events={filteredEvents}
+            emptyLabel="No events nearby."
+            onSelect={(eventItem) => openEventModal(eventItem.event_id)}
+          />
+        </div>
       </div>
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
