@@ -33,6 +33,9 @@ const EventList = ({ events, emptyLabel, onSelect }) => {
                 <p className="font-semibold text-slate-900">{event.title}</p>
                 {postedAt && <p className="text-xs text-slate-500">{postedAt}</p>}
               </div>
+              {event.creator_username && (
+                <p className="text-xs text-slate-500 mt-1">@{event.creator_username}</p>
+              )}
               {event.description && (
                 <p className="text-xs text-slate-500 mt-1">
                   {event.description.length > 90

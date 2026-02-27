@@ -3,6 +3,8 @@ const Event = require("../models/Event");
 const EventJoin = require("../models/EventJoin");
 const EventLike = require("../models/EventLike");
 const EventComment = require("../models/EventComment");
+const User = require("../models/User");
+const { sendCommentNotification } = require("../services/mailer");
 const { requireAuth, requireVerified } = require("../middleware/auth");
 
 const router = express.Router();
@@ -319,6 +321,26 @@ router.post("/:event_id/comments", requireAuth, requireVerified, async (req, res
       uid: req.user.uid,
       body
     });
+    try {
+      const event = await Event.findById(event_id).select("title creator_uid").lean();
+      if (
+        event &&
+        event.creator_uid &&
+        event.creator_uid.toString() !== req.user.uid
+      ) {
+        const creator = await User.findById(event.creator_uid).select("email username").lean();
+        await sendCommentNotification({
+          toEmail: creator?.email,
+          creatorUsername: creator?.username,
+          eventId: event_id,
+          eventTitle: event.title || "your event",
+          commenterUsername: req.user.username,
+          commentBody: body
+        });
+      }
+    } catch (notifyError) {
+      console.error("Failed to send comment notification email", notifyError);
+    }
     return res.json({
       comment_id: comment._id.toString(),
       event_id: comment.event_id.toString(),

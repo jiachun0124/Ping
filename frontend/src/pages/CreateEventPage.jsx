@@ -1,24 +1,34 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import {
+  loadEventDraftById,
+  removeEventDraft,
+  saveEventDraft
+} from "../utils/eventDraft.js";
 
 const CreateEventPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
   });
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "",
-    place_name: "Current location",
-    lat: 39.9522,
-    lng: -75.1932,
-    max_participants: 4
-  });
+  const draftId = location.state?.draftId || null;
+  const initialDraft = draftId ? loadEventDraftById(user?.uid, draftId) : null;
+  const [form, setForm] = useState(
+    initialDraft?.form || {
+      title: "",
+      description: "",
+      category: "",
+      place_name: "Current location",
+      lat: 39.9522,
+      lng: -75.1932,
+      max_participants: 4
+    }
+  );
   const [status, setStatus] = useState("");
 
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
@@ -107,10 +117,33 @@ const CreateEventPage = () => {
         lng: Number(form.lng),
         max_participants: Number(form.max_participants)
       });
+      if (draftId) {
+        removeEventDraft(user?.uid, draftId);
+      }
       navigate(`/events/${created.event_id}`);
     } catch (error) {
       setStatus(error.message);
     }
+  };
+
+  const handleSaveDraft = () => {
+    const result = saveEventDraft(
+      user?.uid,
+      {
+        ...form,
+        lat: Number(form.lat),
+        lng: Number(form.lng),
+        max_participants: Number(form.max_participants)
+      },
+      draftId
+    );
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+    navigate("/map", {
+      state: { flashMessage: "Draft saved to your profile." }
+    });
   };
 
   if (!user?.is_verified) {
@@ -235,12 +268,21 @@ const CreateEventPage = () => {
             />
           </label>
           {status && <p className="text-sm text-rose-500">{status}</p>}
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white rounded-lg py-2"
-          >
-            Create event
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="w-full border border-slate-300 text-slate-700 rounded-lg py-2"
+            >
+              Save draft
+            </button>
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 text-white rounded-lg py-2"
+            >
+              Create event
+            </button>
+          </div>
         </form>
       </div>
     </main>

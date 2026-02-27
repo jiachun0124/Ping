@@ -17,7 +17,13 @@ const config = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   googleCallbackUrl:
     process.env.GOOGLE_CALLBACK_URL ||
-    "http://127.0.0.1:4000/auth/google/callback"
+    "http://127.0.0.1:4000/auth/google/callback",
+  smtpHost: process.env.SMTP_HOST || "",
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPass: process.env.SMTP_PASS || "",
+  smtpFrom: process.env.SMTP_FROM || "",
+  smtpSecure: process.env.SMTP_SECURE === "true"
 };
 
 if (!config.mongoUri) {

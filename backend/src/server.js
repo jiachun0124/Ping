@@ -68,6 +68,12 @@ const start = async () => {
   await mongoose.connect(config.mongoUri);
   app.listen(config.port, config.host, () => {
     console.log(`Ping backend listening on http://${config.host}:${config.port}`);
+    const emailNotificationsEnabled = Boolean(
+      config.smtpHost && config.smtpPort && config.smtpFrom
+    );
+    console.log(
+      `Email notifications: ${emailNotificationsEnabled ? "enabled" : "disabled"}`
+    );
   });
 };
 

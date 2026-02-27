@@ -32,7 +32,16 @@ router.get("/", async (req, res, next) => {
         }
       },
       { $sort: { start_time: -1 } },
-      { $limit: limit }
+      { $limit: limit },
+      {
+        $lookup: {
+          from: "users",
+          localField: "creator_uid",
+          foreignField: "_id",
+          as: "creator"
+        }
+      },
+      { $unwind: { path: "$creator", preserveNullAndEmptyArrays: true } }
     ]);
     const mapped = await Promise.all(
       items.map(async (event) => {
@@ -40,6 +49,7 @@ router.get("/", async (req, res, next) => {
         return {
           event_id: event._id.toString(),
           title: event.title,
+          creator_username: event.creator?.username || null,
           description: event.description,
           category: event.category,
           start_time: event.start_time,

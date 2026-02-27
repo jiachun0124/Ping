@@ -4,11 +4,13 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import MapView from "../components/MapView.jsx";
 import EventList from "../components/EventList.jsx";
 import FilterPanel from "../components/FilterPanel.jsx";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const MapPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
   const [points, setPoints] = useState([]);
   const [events, setEvents] = useState([]);
   const [filters, setFilters] = useState({
@@ -19,8 +21,15 @@ const MapPage = () => {
   const [status, setStatus] = useState("");
   const [userLocation, setUserLocation] = useState({ lat: 39.9522, lng: -75.1932 });
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedEventComments, setSelectedEventComments] = useState([]);
+  const [modalCommentInput, setModalCommentInput] = useState("");
+  const [modalCommentStatus, setModalCommentStatus] = useState("");
+  const [isModalEditing, setIsModalEditing] = useState(false);
+  const [modalEditForm, setModalEditForm] = useState(null);
+  const [modalEditStatus, setModalEditStatus] = useState("");
   const [modalStatus, setModalStatus] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [draftSavedFlash, setDraftSavedFlash] = useState("");
 
   const loadData = async () => {
     setStatus("Loading map...");
@@ -91,6 +100,20 @@ const MapPage = () => {
     loadData();
   }, [filters.radiusMiles, userLocation.lat, userLocation.lng]);
 
+  useEffect(() => {
+    if (!location.state?.flashMessage) return;
+    setDraftSavedFlash(location.state.flashMessage);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (!draftSavedFlash) return;
+    const timeout = setTimeout(() => {
+      setDraftSavedFlash("");
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, [draftSavedFlash]);
+
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       if (filters.onlyOpen && event.status !== "active") {
@@ -111,9 +134,18 @@ const MapPage = () => {
   const openEventModal = async (eventId) => {
     setShowModal(true);
     setModalStatus("Loading...");
+    setModalCommentInput("");
+    setModalCommentStatus("");
     try {
-      const data = await api.getEvent(eventId);
-      setSelectedEvent(data);
+      const [eventData, commentsData] = await Promise.all([
+        api.getEvent(eventId),
+        api.getComments(eventId)
+      ]);
+      setSelectedEvent(eventData);
+      setModalEditForm(null);
+      setIsModalEditing(false);
+      setModalEditStatus("");
+      setSelectedEventComments(commentsData.items || []);
       setModalStatus("");
     } catch (error) {
       setModalStatus(error.message);
@@ -123,6 +155,12 @@ const MapPage = () => {
   const closeModal = () => {
     setShowModal(false);
     setSelectedEvent(null);
+    setSelectedEventComments([]);
+    setModalCommentInput("");
+    setModalCommentStatus("");
+    setIsModalEditing(false);
+    setModalEditForm(null);
+    setModalEditStatus("");
     setModalStatus("");
   };
 
@@ -199,6 +237,136 @@ const MapPage = () => {
     }
   };
 
+  const handleModalComment = async (eventForm) => {
+    eventForm.preventDefault();
+    if (!selectedEvent || !modalCommentInput.trim()) return;
+    setModalCommentStatus("");
+    try {
+      const createdComment = await api.postComment(selectedEvent.event_id, {
+        body: modalCommentInput.trim()
+      });
+      setSelectedEventComments((prev) => [createdComment, ...prev]);
+      setSelectedEvent((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          counts: {
+            ...(prev.counts || {}),
+            comments: (prev.counts?.comments || 0) + 1
+          }
+        };
+      });
+      setModalCommentInput("");
+    } catch (error) {
+      setModalCommentStatus(error.message);
+    }
+  };
+
+  const handleModalDelete = async () => {
+    if (!selectedEvent) return;
+    const confirmed = window.confirm("Delete this event?");
+    if (!confirmed) return;
+    setModalStatus("");
+    try {
+      await api.deleteEvent(selectedEvent.event_id);
+      setEvents((prev) => prev.filter((item) => item.event_id !== selectedEvent.event_id));
+      setPoints((prev) => prev.filter((item) => item.id !== selectedEvent.event_id));
+      closeModal();
+    } catch (error) {
+      setModalStatus(error.message);
+    }
+  };
+
+  const handleModalEditStart = () => {
+    if (!selectedEvent) return;
+    setModalEditForm({
+      title: selectedEvent.title || "",
+      description: selectedEvent.description || "",
+      category: selectedEvent.category || "",
+      place_name: selectedEvent.place_name || "",
+      lat: selectedEvent.lat,
+      lng: selectedEvent.lng,
+      max_participants: selectedEvent.max_participants || 4
+    });
+    setModalEditStatus("");
+    setIsModalEditing(true);
+  };
+
+  const handleModalEditCancel = () => {
+    setIsModalEditing(false);
+    setModalEditForm(null);
+    setModalEditStatus("");
+  };
+
+  const handleModalEditSave = async (eventForm) => {
+    eventForm.preventDefault();
+    if (!selectedEvent || !modalEditForm) return;
+    setModalEditStatus("");
+    try {
+      let resolvedLat = Number(modalEditForm.lat);
+      let resolvedLng = Number(modalEditForm.lng);
+      let resolvedPlaceName = modalEditForm.place_name;
+
+      if (
+        mapsKey &&
+        modalEditForm.place_name &&
+        modalEditForm.place_name.trim() &&
+        modalEditForm.place_name.trim() !== selectedEvent.place_name
+      ) {
+        const geocodeResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+            modalEditForm.place_name.trim()
+          )}&key=${mapsKey}`
+        );
+        const geocodeData = await geocodeResponse.json();
+        if (geocodeData.status === "OK" && geocodeData.results?.[0]) {
+          const result = geocodeData.results[0];
+          resolvedLat = result.geometry.location.lat;
+          resolvedLng = result.geometry.location.lng;
+          resolvedPlaceName = result.formatted_address;
+        } else {
+          setModalEditStatus("Could not find that address.");
+          return;
+        }
+      }
+
+      const updated = await api.updateEvent(selectedEvent.event_id, {
+        ...modalEditForm,
+        lat: resolvedLat,
+        lng: resolvedLng,
+        place_name: resolvedPlaceName,
+        max_participants: Number(modalEditForm.max_participants)
+      });
+      setSelectedEvent((prev) => ({ ...prev, ...updated }));
+      setEvents((prev) =>
+        prev.map((item) =>
+          item.event_id === selectedEvent.event_id
+            ? {
+                ...item,
+                title: updated.title,
+                description: updated.description,
+                category: updated.category,
+                place_name: updated.place_name,
+                lat: updated.lat,
+                lng: updated.lng
+              }
+            : item
+        )
+      );
+      setPoints((prev) =>
+        prev.map((item) =>
+          item.id === selectedEvent.event_id
+            ? { ...item, title: updated.title, lat: updated.lat, lng: updated.lng }
+            : item
+        )
+      );
+      setIsModalEditing(false);
+      setModalEditForm(null);
+    } catch (error) {
+      setModalEditStatus(error.message);
+    }
+  };
+
   return (
     <main className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-[180px_1fr_320px] gap-6">
       <div className="space-y-4">
@@ -259,50 +427,209 @@ const MapPage = () => {
             )}
             {selectedEvent && !modalStatus && (
               <>
-                <p className="mt-4 text-slate-700">
-                  {selectedEvent.description || "No details yet."}
-                </p>
+                {isModalEditing && modalEditForm ? (
+                  <form className="mt-4 space-y-3" onSubmit={handleModalEditSave}>
+                    <label className="block text-sm text-slate-700">
+                      Title
+                      <input
+                        type="text"
+                        value={modalEditForm.title}
+                        onChange={(eventInput) =>
+                          setModalEditForm((prev) => ({ ...prev, title: eventInput.target.value }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                        required
+                      />
+                    </label>
+                    <label className="block text-sm text-slate-700">
+                      Description
+                      <textarea
+                        value={modalEditForm.description}
+                        onChange={(eventInput) =>
+                          setModalEditForm((prev) => ({
+                            ...prev,
+                            description: eventInput.target.value
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                        rows="3"
+                      />
+                    </label>
+                    <label className="block text-sm text-slate-700">
+                      Category
+                      <select
+                        value={modalEditForm.category}
+                        onChange={(eventInput) =>
+                          setModalEditForm((prev) => ({
+                            ...prev,
+                            category: eventInput.target.value
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                        required
+                      >
+                        <option value="" disabled>
+                          Select a category
+                        </option>
+                        <option value="sport">Sport</option>
+                        <option value="art">Art</option>
+                        <option value="social">Social</option>
+                        <option value="study">Study</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm text-slate-700">
+                      Location
+                      <input
+                        type="text"
+                        value={modalEditForm.place_name}
+                        onChange={(eventInput) =>
+                          setModalEditForm((prev) => ({
+                            ...prev,
+                            place_name: eventInput.target.value
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                        required
+                      />
+                    </label>
+                    <label className="block text-sm text-slate-700">
+                      Max participants
+                      <input
+                        type="number"
+                        value={modalEditForm.max_participants}
+                        onChange={(eventInput) =>
+                          setModalEditForm((prev) => ({
+                            ...prev,
+                            max_participants: eventInput.target.value
+                          }))
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                      />
+                    </label>
+                    {modalEditStatus && <p className="text-sm text-rose-500">{modalEditStatus}</p>}
+                    <div className="flex gap-3">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleModalEditCancel}
+                        className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="mt-4 text-slate-700">
+                    {selectedEvent.description || "No details yet."}
+                  </p>
+                )}
                 <div className="mt-4 flex gap-4 text-sm text-slate-500">
                   <span>Going: {selectedEvent.counts?.going ?? 0}</span>
                   <span>Saved: {selectedEvent.counts?.interested ?? 0}</span>
                   <span>Comments: {selectedEvent.counts?.comments ?? 0}</span>
                 </div>
-                <div className="mt-6 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handleModalGoing}
-                    disabled={!user?.is_verified}
-                    className={`px-4 py-2 rounded-lg disabled:bg-slate-300 ${
-                      selectedEvent.viewer_state?.going
-                        ? "bg-indigo-600 text-white"
-                        : "border border-slate-300 text-slate-600"
-                    }`}
-                  >
-                    Going
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleModalSave}
-                    disabled={!user?.is_verified}
-                    className={`px-4 py-2 rounded-lg disabled:bg-slate-300 ${
-                      selectedEvent.viewer_state?.interested
-                        ? "bg-indigo-600 text-white"
-                        : "border border-slate-300 text-slate-600"
-                    }`}
-                  >
-                    {selectedEvent.viewer_state?.interested ? "Saved" : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/events/${selectedEvent.event_id}`)}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600"
-                  >
-                    Details
-                  </button>
+                <div className="mt-6 flex items-center justify-between gap-3">
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleModalGoing}
+                      disabled={!user?.is_verified || isModalEditing}
+                      className={`px-4 py-2 rounded-lg disabled:bg-slate-300 ${
+                        selectedEvent.viewer_state?.going
+                          ? "bg-indigo-600 text-white"
+                          : "border border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      Going
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleModalSave}
+                      disabled={!user?.is_verified || isModalEditing}
+                      className={`px-4 py-2 rounded-lg disabled:bg-slate-300 ${
+                        selectedEvent.viewer_state?.interested
+                          ? "bg-indigo-600 text-white"
+                          : "border border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      {selectedEvent.viewer_state?.interested ? "Saved" : "Save"}
+                    </button>
+                  </div>
+                  {user?.uid === selectedEvent.creator_uid && (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={isModalEditing ? handleModalEditCancel : handleModalEditStart}
+                        className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600"
+                      >
+                        {isModalEditing ? "Cancel edit" : "Edit"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleModalDelete}
+                        disabled={isModalEditing}
+                        className="px-4 py-2 rounded-lg border border-rose-200 text-rose-600 disabled:bg-slate-200"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold text-slate-700">Comments</h4>
+                  <form className="mt-2 flex gap-2" onSubmit={handleModalComment}>
+                    <input
+                      type="text"
+                      value={modalCommentInput}
+                      onChange={(eventInput) => setModalCommentInput(eventInput.target.value)}
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="Say something..."
+                      disabled={!user?.is_verified}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!user?.is_verified || !modalCommentInput.trim()}
+                      className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:bg-slate-300"
+                    >
+                      Post
+                    </button>
+                  </form>
+                  {modalCommentStatus && (
+                    <p className="mt-2 text-sm text-rose-500">{modalCommentStatus}</p>
+                  )}
+                  {!user?.is_verified && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Sign in with a verified account to comment.
+                    </p>
+                  )}
+                  <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-3 space-y-3">
+                    {selectedEventComments.length === 0 ? (
+                      <p className="text-sm text-slate-500">No comments yet.</p>
+                    ) : (
+                      selectedEventComments.map((comment) => (
+                        <div key={comment.comment_id}>
+                          <p className="text-sm text-slate-700">{comment.body}</p>
+                          <p className="text-xs text-slate-400 mt-1">
+                            {new Date(comment.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </>
             )}
           </div>
+        </div>
+      )}
+      {draftSavedFlash && (
+        <div className="fixed right-4 bottom-4 z-50 rounded-lg border border-emerald-200 bg-white px-4 py-3 shadow-lg">
+          <p className="text-sm text-emerald-700">{draftSavedFlash}</p>
         </div>
       )}
     </main>
