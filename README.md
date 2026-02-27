@@ -81,4 +81,8 @@ Set environment variables:
 
 ## Acknowledgements
 The initial idea was developed during a hackathon collaboration with @jl205-maker, Suosi He, Zihan Zhu. 
+<<<<<<< HEAD
 This version has been fully redesigned and implemented independently.
+=======
+This version has been fully redesigned and implemented independently.
+>>>>>>> d105c3f (readme)
