@@ -248,6 +248,33 @@ const MapPage = () => {
     }
   };
 
+  const handleModalLike = async () => {
+    if (!selectedEvent) return;
+    try {
+      const response = selectedEvent.viewer_state?.liked
+        ? await api.unsetLike(selectedEvent.event_id)
+        : await api.setLike(selectedEvent.event_id);
+
+      setSelectedEvent((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          counts: {
+            ...(prev.counts || {}),
+            likes: response.like_count
+          },
+          viewer_state: {
+            ...(prev.viewer_state || {}),
+            liked: response.liked
+          }
+        };
+      });
+      setModalStatus("");
+    } catch (error) {
+      setModalStatus(error.message);
+    }
+  };
+
   const handleModalComment = async (eventForm) => {
     eventForm.preventDefault();
     if (!selectedEvent || !modalCommentInput.trim()) return;
@@ -602,6 +629,30 @@ const MapPage = () => {
                       }`}
                     >
                       {selectedEvent.viewer_state?.interested ? "Saved" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleModalLike}
+                      disabled={!user?.is_verified || isModalEditing}
+                      className="p-2 rounded-lg border border-slate-300 text-slate-600 disabled:bg-slate-300"
+                      aria-label={
+                        selectedEvent.viewer_state?.liked ? "Unlike event" : "Like event"
+                      }
+                      title={selectedEvent.viewer_state?.liked ? "Unlike" : "Like"}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className={`h-5 w-5 ${
+                          selectedEvent.viewer_state?.liked
+                            ? "fill-rose-500 stroke-rose-500"
+                            : "fill-none stroke-current"
+                        }`}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
                     </button>
                   </div>
                   {user?.uid === selectedEvent.creator_uid && (

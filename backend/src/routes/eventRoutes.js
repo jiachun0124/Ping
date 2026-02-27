@@ -2,6 +2,7 @@ const express = require("express");
 const Event = require("../models/Event");
 const EventJoin = require("../models/EventJoin");
 const EventLike = require("../models/EventLike");
+const EventSave = require("../models/EventSave");
 const EventComment = require("../models/EventComment");
 const User = require("../models/User");
 const { sendCommentNotification } = require("../services/mailer");
@@ -13,23 +14,25 @@ const EVENT_DURATION_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const COMMENT_DELETE_WINDOW_MS = 3 * 60 * 1000;
 
 const getCounts = async (eventId) => {
-  const [going, interested, comments] = await Promise.all([
+  const [going, interested, likes, comments] = await Promise.all([
     EventJoin.countDocuments({ event_id: eventId }),
+    EventSave.countDocuments({ event_id: eventId }),
     EventLike.countDocuments({ event_id: eventId }),
     EventComment.countDocuments({ event_id: eventId })
   ]);
-  return { going, interested, comments };
+  return { going, interested, likes, comments };
 };
 
 const getViewerState = async (eventId, userId) => {
   if (!userId) {
-    return { going: false, interested: false };
+    return { going: false, interested: false, liked: false };
   }
-  const [going, interested] = await Promise.all([
+  const [going, interested, liked] = await Promise.all([
     EventJoin.exists({ event_id: eventId, uid: userId }),
+    EventSave.exists({ event_id: eventId, uid: userId }),
     EventLike.exists({ event_id: eventId, uid: userId })
   ]);
-  return { going: Boolean(going), interested: Boolean(interested) };
+  return { going: Boolean(going), interested: Boolean(interested), liked: Boolean(liked) };
 };
 
 router.post("/", requireAuth, requireVerified, async (req, res, next) => {
@@ -218,6 +221,7 @@ router.delete("/:event_id", requireAuth, requireVerified, async (req, res, next)
     }
     await Promise.all([
       EventJoin.deleteMany({ event_id }),
+      EventSave.deleteMany({ event_id }),
       EventLike.deleteMany({ event_id }),
       EventComment.deleteMany({ event_id })
     ]);
@@ -256,9 +260,9 @@ router.delete("/:event_id/going", requireAuth, requireVerified, async (req, res,
 router.post("/:event_id/interested", requireAuth, requireVerified, async (req, res, next) => {
   const { event_id } = req.params;
   try {
-    await EventLike.updateOne(
+    await EventSave.updateOne(
       { event_id, uid: req.user.uid },
-      { $setOnInsert: { event_id, uid: req.user.uid, liked_at: new Date() } },
+      { $setOnInsert: { event_id, uid: req.user.uid, saved_at: new Date() } },
       { upsert: true }
     );
     const counts = await getCounts(event_id);
@@ -275,13 +279,39 @@ router.post("/:event_id/interested", requireAuth, requireVerified, async (req, r
 router.delete("/:event_id/interested", requireAuth, requireVerified, async (req, res, next) => {
   const { event_id } = req.params;
   try {
-    await EventLike.deleteOne({ event_id, uid: req.user.uid });
+    await EventSave.deleteOne({ event_id, uid: req.user.uid });
     const counts = await getCounts(event_id);
     return res.json({
       event_id,
       interested: false,
       interested_count: counts.interested
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/:event_id/like", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    await EventLike.updateOne(
+      { event_id, uid: req.user.uid },
+      { $setOnInsert: { event_id, uid: req.user.uid, liked_at: new Date() } },
+      { upsert: true }
+    );
+    const counts = await getCounts(event_id);
+    return res.json({ event_id, liked: true, like_count: counts.likes });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/:event_id/like", requireAuth, requireVerified, async (req, res, next) => {
+  const { event_id } = req.params;
+  try {
+    await EventLike.deleteOne({ event_id, uid: req.user.uid });
+    const counts = await getCounts(event_id);
+    return res.json({ event_id, liked: false, like_count: counts.likes });
   } catch (error) {
     return next(error);
   }

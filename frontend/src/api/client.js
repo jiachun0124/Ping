@@ -65,6 +65,8 @@ export const api = {
     request(`/events/${eventId}/interested`, { method: "POST" }),
   unsetInterested: (eventId) =>
     request(`/events/${eventId}/interested`, { method: "DELETE" }),
+  setLike: (eventId) => request(`/events/${eventId}/like`, { method: "POST" }),
+  unsetLike: (eventId) => request(`/events/${eventId}/like`, { method: "DELETE" }),
   getComments: (eventId) => request(`/events/${eventId}/comments`),
   postComment: (eventId, payload) =>
     request(`/events/${eventId}/comments`, {

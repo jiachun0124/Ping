@@ -1,6 +1,6 @@
 const express = require("express");
 const User = require("../models/User");
-const EventLike = require("../models/EventLike");
+const EventSave = require("../models/EventSave");
 const Event = require("../models/Event");
 const { requireAuth, requireVerified } = require("../middleware/auth");
 
@@ -52,10 +52,10 @@ router.put("/me", requireAuth, async (req, res, next) => {
 
 router.get("/me/interested", requireAuth, requireVerified, async (req, res, next) => {
   try {
-    const likes = await EventLike.find({ uid: req.user.uid })
-      .sort({ liked_at: -1 })
+    const saves = await EventSave.find({ uid: req.user.uid })
+      .sort({ saved_at: -1 })
       .lean();
-    const eventIds = likes.map((like) => like.event_id);
+    const eventIds = saves.map((save) => save.event_id);
     const events = await Event.find({ _id: { $in: eventIds } })
       .select("title status start_time end_time place_name lat lng")
       .lean();
@@ -85,9 +85,9 @@ router.get("/me/interested", requireAuth, requireVerified, async (req, res, next
 router.post("/me/interested/:event_id", requireAuth, requireVerified, async (req, res, next) => {
   const { event_id } = req.params;
   try {
-    await EventLike.updateOne(
+    await EventSave.updateOne(
       { event_id, uid: req.user.uid },
-      { $setOnInsert: { event_id, uid: req.user.uid, liked_at: new Date() } },
+      { $setOnInsert: { event_id, uid: req.user.uid, saved_at: new Date() } },
       { upsert: true }
     );
     return res.json({ event_id, interested: true });
@@ -103,7 +103,7 @@ router.delete(
   async (req, res, next) => {
     const { event_id } = req.params;
     try {
-      await EventLike.deleteOne({ event_id, uid: req.user.uid });
+      await EventSave.deleteOne({ event_id, uid: req.user.uid });
       return res.json({ event_id, interested: false });
     } catch (error) {
       return next(error);

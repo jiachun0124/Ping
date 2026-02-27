@@ -31,10 +31,10 @@ const EventList = ({ events, emptyLabel, onSelect }) => {
             <div className="w-full">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="font-semibold text-slate-900">{event.title}</p>
-                {postedAt && <p className="text-xs text-slate-500">{postedAt}</p>}
+                {postedAt && <p className="text-xs text-slate-500 whitespace-nowrap">{postedAt}</p>}
               </div>
               {event.description && (
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="mt-2 text-sm text-slate-700 leading-5 italic">
                   {event.description.length > 90
                     ? `${event.description.slice(0, 90)}...`
                     : event.description}
