@@ -13,7 +13,8 @@ const ProfilePage = () => {
     school: "",
     program: "",
     major: "",
-    interest_tags: []
+    interest_tags: [],
+    receive_comment_emails: true
   });
   const [tagsInput, setTagsInput] = useState("");
   const [status, setStatus] = useState("");
@@ -28,7 +29,8 @@ const ProfilePage = () => {
         school: data.school || "",
         program: data.program || "",
         major: data.major || "",
-        interest_tags: data.interest_tags || []
+        interest_tags: data.interest_tags || [],
+        receive_comment_emails: data.receive_comment_emails !== false
       });
       setTagsInput((data.interest_tags || []).join(", "));
     };
@@ -141,6 +143,19 @@ const ProfilePage = () => {
               onChange={(event) => setTagsInput(event.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
             />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={Boolean(form.receive_comment_emails)}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  receive_comment_emails: event.target.checked
+                }))
+              }
+            />
+            Receive email notifications for new comments on my events
           </label>
           <div className="flex items-center gap-3">
             <button

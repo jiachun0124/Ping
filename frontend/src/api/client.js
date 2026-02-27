@@ -70,5 +70,9 @@ export const api = {
     request(`/events/${eventId}/comments`, {
       method: "POST",
       body: JSON.stringify(payload)
+    }),
+  deleteComment: (eventId, commentId) =>
+    request(`/events/${eventId}/comments/${commentId}`, {
+      method: "DELETE"
     })
 };

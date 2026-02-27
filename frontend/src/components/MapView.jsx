@@ -3,7 +3,7 @@ import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 
 const defaultCenter = { lat: 39.9522, lng: -75.1932 };
 
-const MapView = ({ points, onSelect, center }) => {
+const MapView = ({ points, onSelect, center, zoom = 14 }) => {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
   });
@@ -25,7 +25,7 @@ const MapView = ({ points, onSelect, center }) => {
 
   return (
     <GoogleMap
-      zoom={14}
+      zoom={zoom}
       center={center || defaultCenter}
       mapContainerStyle={{ width: "100%", height: "100%" }}
       options={{ streetViewControl: false, mapTypeControl: false }}

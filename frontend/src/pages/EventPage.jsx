@@ -14,6 +14,8 @@ const EventPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [editStatus, setEditStatus] = useState("");
+  const isCommentWithinDeleteWindow = (comment) =>
+    Date.now() - new Date(comment.created_at).getTime() <= 3 * 60 * 1000;
 
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
@@ -134,6 +136,25 @@ const EventPage = () => {
     await api.postComment(eventId, { body: commentInput.trim() });
     setCommentInput("");
     await load();
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await api.deleteComment(eventId, commentId);
+      setComments((prev) => prev.filter((comment) => comment.comment_id !== commentId));
+      setEvent((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          counts: {
+            ...(prev.counts || {}),
+            comments: Math.max(0, (prev.counts?.comments || 0) - 1)
+          }
+        };
+      });
+    } catch (error) {
+      setStatus(error.message);
+    }
   };
 
   if (!event) {
@@ -330,10 +351,27 @@ const EventPage = () => {
           )}
           {comments.map((comment) => (
             <div key={comment.comment_id} className="border-b border-slate-100 pb-2">
+              <p className="text-xs text-slate-500">@{comment.username || "user"}</p>
               <p className="text-sm text-slate-700">{comment.body}</p>
-              <p className="text-xs text-slate-400 mt-1">
-                {new Date(comment.created_at).toLocaleString()}
-              </p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-400">
+                  {new Date(comment.created_at).toLocaleString([], {
+                    month: "short",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })}
+                </p>
+                {user?.uid === comment.uid && isCommentWithinDeleteWindow(comment) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteComment(comment.comment_id)}
+                    className="text-xs text-rose-600 hover:text-rose-700"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -33,9 +33,6 @@ const EventList = ({ events, emptyLabel, onSelect }) => {
                 <p className="font-semibold text-slate-900">{event.title}</p>
                 {postedAt && <p className="text-xs text-slate-500">{postedAt}</p>}
               </div>
-              {event.creator_username && (
-                <p className="text-xs text-slate-500 mt-1">@{event.creator_username}</p>
-              )}
               {event.description && (
                 <p className="text-xs text-slate-500 mt-1">
                   {event.description.length > 90
@@ -45,21 +42,28 @@ const EventList = ({ events, emptyLabel, onSelect }) => {
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              {event.place_name
-                ? event.place_name
-                    .split(",")
-                    .map((part) => part.trim())
-                    .filter(Boolean)[0] || "Campus area"
-                : "Campus area"}
-            </span>
-            <span>
-              Active
-              {typeof event.counts?.going === "number"
-                ? ` · ${event.counts.going} going`
-                : ""}
-            </span>
+          <div className="mt-2 text-xs text-slate-500">
+            {event.creator_username && (
+              <div className="flex justify-end">
+                <span>@{event.creator_username}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span>
+                {event.place_name
+                  ? event.place_name
+                      .split(",")
+                      .map((part) => part.trim())
+                      .filter(Boolean)[0] || "Campus area"
+                  : "Campus area"}
+              </span>
+              <span>
+                Active
+                {typeof event.counts?.going === "number"
+                  ? ` · ${event.counts.going} going`
+                  : ""}
+              </span>
+            </div>
           </div>
         </button>
       );

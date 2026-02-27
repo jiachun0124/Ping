@@ -9,7 +9,8 @@ const userSchema = new mongoose.Schema(
     program: String,
     major: String,
     is_verified: { type: Boolean, default: false },
-    interest_tags: [String]
+    interest_tags: [String],
+    receive_comment_emails: { type: Boolean, default: true }
   },
   { timestamps: true }
 );

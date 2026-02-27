@@ -30,6 +30,8 @@ const MapPage = () => {
   const [modalStatus, setModalStatus] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [draftSavedFlash, setDraftSavedFlash] = useState("");
+  const isCommentWithinDeleteWindow = (comment) =>
+    Date.now() - new Date(comment.created_at).getTime() <= 3 * 60 * 1000;
 
   const loadData = async () => {
     setStatus("Loading map...");
@@ -126,6 +128,15 @@ const MapPage = () => {
       return filters.categories.some((category) => tag.includes(category));
     });
   }, [events, filters]);
+
+  const mapZoom = useMemo(() => {
+    const radius = Number(filters.radiusMiles) || 5;
+    if (radius <= 2) return 15;
+    if (radius <= 5) return 14;
+    if (radius <= 10) return 13;
+    if (radius <= 15) return 12;
+    return 11;
+  }, [filters.radiusMiles]);
 
   const handleSelectPoint = (point) => {
     openEventModal(point.id);
@@ -277,6 +288,32 @@ const MapPage = () => {
     }
   };
 
+  const handleModalCommentDelete = async (commentId) => {
+    if (!selectedEvent) return;
+    setModalCommentStatus("");
+    try {
+      await api.deleteComment(selectedEvent.event_id, commentId);
+      setSelectedEventComments((prev) =>
+        prev.filter((comment) => comment.comment_id !== commentId)
+      );
+      setSelectedEvent((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          counts: {
+            ...(prev.counts || {}),
+            comments: Math.max(0, (prev.counts?.comments || 0) - 1)
+          }
+        };
+      });
+      updateEventCountsInList(selectedEvent.event_id, {
+        comments: Math.max(0, (selectedEvent.counts?.comments || 0) - 1)
+      });
+    } catch (error) {
+      setModalCommentStatus(error.message);
+    }
+  };
+
   const handleModalEditStart = () => {
     if (!selectedEvent) return;
     setModalEditForm({
@@ -378,7 +415,12 @@ const MapPage = () => {
         </div>
       </div>
       <div className="bg-white rounded-2xl border border-slate-200 min-h-[700px] overflow-hidden">
-        <MapView points={points} onSelect={handleSelectPoint} center={userLocation} />
+        <MapView
+          points={points}
+          onSelect={handleSelectPoint}
+          center={userLocation}
+          zoom={mapZoom}
+        />
       </div>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -613,10 +655,27 @@ const MapPage = () => {
                     ) : (
                       selectedEventComments.map((comment) => (
                         <div key={comment.comment_id}>
+                          <p className="text-xs text-slate-500">@{comment.username || "user"}</p>
                           <p className="text-sm text-slate-700">{comment.body}</p>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {new Date(comment.created_at).toLocaleString()}
-                          </p>
+                          <div className="mt-1 flex items-center justify-between gap-3">
+                            <p className="text-xs text-slate-400">
+                              {new Date(comment.created_at).toLocaleString([], {
+                                month: "short",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </p>
+                            {user?.uid === comment.uid && isCommentWithinDeleteWindow(comment) && (
+                              <button
+                                type="button"
+                                onClick={() => handleModalCommentDelete(comment.comment_id)}
+                                className="text-xs text-rose-600 hover:text-rose-700"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}

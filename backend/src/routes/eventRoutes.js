@@ -10,6 +10,7 @@ const { requireAuth, requireVerified } = require("../middleware/auth");
 const router = express.Router();
 // Temporary: keep events effectively non-expiring until growth requires stricter TTL.
 const EVENT_DURATION_MS = 100 * 365 * 24 * 60 * 60 * 1000;
+const COMMENT_DELETE_WINDOW_MS = 3 * 60 * 1000;
 
 const getCounts = async (eventId) => {
   const [going, interested, comments] = await Promise.all([
@@ -293,13 +294,15 @@ router.get("/:event_id/comments", async (req, res, next) => {
       event_id,
       parent_comment_id: null
     })
+      .populate("uid", "username")
       .sort({ created_at: -1 })
       .limit(50)
       .lean();
     const mapped = items.map((comment) => ({
       comment_id: comment._id.toString(),
       event_id: comment.event_id.toString(),
-      uid: comment.uid.toString(),
+      uid: comment.uid?._id ? comment.uid._id.toString() : comment.uid.toString(),
+      username: comment.uid?.username || null,
       body: comment.body,
       created_at: comment.created_at
     }));
@@ -328,23 +331,37 @@ router.post("/:event_id/comments", requireAuth, requireVerified, async (req, res
         event.creator_uid &&
         event.creator_uid.toString() !== req.user.uid
       ) {
-        const creator = await User.findById(event.creator_uid).select("email username").lean();
-        await sendCommentNotification({
-          toEmail: creator?.email,
-          creatorUsername: creator?.username,
-          eventId: event_id,
-          eventTitle: event.title || "your event",
-          commenterUsername: req.user.username,
-          commentBody: body
-        });
+        const commentId = comment._id.toString();
+        setTimeout(async () => {
+          try {
+            // Only notify after delete window if the comment still exists.
+            const stillExists = await EventComment.exists({ _id: commentId, event_id });
+            if (!stillExists) return;
+            const creator = await User.findById(event.creator_uid)
+              .select("email username receive_comment_emails")
+              .lean();
+            if (creator?.receive_comment_emails === false) return;
+            await sendCommentNotification({
+              toEmail: creator?.email,
+              creatorUsername: creator?.username,
+              eventId: event_id,
+              eventTitle: event.title || "your event",
+              commenterUsername: req.user.username,
+              commentBody: body
+            });
+          } catch (notifyError) {
+            console.error("Failed to send delayed comment notification email", notifyError);
+          }
+        }, COMMENT_DELETE_WINDOW_MS);
       }
     } catch (notifyError) {
-      console.error("Failed to send comment notification email", notifyError);
+      console.error("Failed to schedule comment notification email", notifyError);
     }
     return res.json({
       comment_id: comment._id.toString(),
       event_id: comment.event_id.toString(),
       uid: comment.uid.toString(),
+      username: req.user.username || null,
       body: comment.body,
       created_at: comment.created_at
     });
@@ -352,6 +369,35 @@ router.post("/:event_id/comments", requireAuth, requireVerified, async (req, res
     return next(error);
   }
 });
+
+router.delete(
+  "/:event_id/comments/:comment_id",
+  requireAuth,
+  requireVerified,
+  async (req, res, next) => {
+    const { event_id, comment_id } = req.params;
+    try {
+      const comment = await EventComment.findOne({
+        _id: comment_id,
+        event_id,
+        parent_comment_id: null
+      }).lean();
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+      if (comment.uid.toString() !== req.user.uid) {
+        return res.status(403).json({ error: "Not allowed" });
+      }
+      if (Date.now() - new Date(comment.created_at).getTime() > COMMENT_DELETE_WINDOW_MS) {
+        return res.status(403).json({ error: "Comment can only be deleted within 3 minutes" });
+      }
+      await EventComment.deleteOne({ _id: comment_id, event_id });
+      return res.json({ comment_id, deleted: true });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 
 router.get(
   "/:event_id/comments/:comment_id/replies",
@@ -362,13 +408,15 @@ router.get(
         event_id,
         parent_comment_id: comment_id
       })
+        .populate("uid", "username")
         .sort({ created_at: 1 })
         .lean();
       const mapped = items.map((comment) => ({
         comment_id: comment._id.toString(),
         event_id: comment.event_id.toString(),
         parent_comment_id: comment.parent_comment_id.toString(),
-        uid: comment.uid.toString(),
+        uid: comment.uid?._id ? comment.uid._id.toString() : comment.uid.toString(),
+        username: comment.uid?.username || null,
         body: comment.body,
         created_at: comment.created_at
       }));

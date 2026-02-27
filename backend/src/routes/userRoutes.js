@@ -9,7 +9,7 @@ const router = express.Router();
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.uid)
-      .select("username age school program major is_verified interest_tags")
+      .select("username age school program major is_verified interest_tags receive_comment_emails")
       .lean();
     return res.json({ uid: req.user.uid, ...user });
   } catch (error) {
@@ -18,9 +18,15 @@ router.get("/me", requireAuth, async (req, res, next) => {
 });
 
 router.put("/me", requireAuth, async (req, res, next) => {
-  const { username, age, school, program, major, interest_tags } = req.body;
-  if (Array.isArray(interest_tags) && (interest_tags.length < 1 || interest_tags.length > 4)) {
-    return res.status(400).json({ error: "interest_tags must be 1-4 items" });
+  const { username, age, school, program, major, interest_tags, receive_comment_emails } = req.body;
+  if (Array.isArray(interest_tags) && interest_tags.length > 4) {
+    return res.status(400).json({ error: "interest_tags must be 0-4 items" });
+  }
+  if (
+    receive_comment_emails !== undefined &&
+    typeof receive_comment_emails !== "boolean"
+  ) {
+    return res.status(400).json({ error: "receive_comment_emails must be boolean" });
   }
   try {
     const updated = await User.findByIdAndUpdate(
@@ -31,11 +37,12 @@ router.put("/me", requireAuth, async (req, res, next) => {
         ...(school !== undefined ? { school } : {}),
         ...(program !== undefined ? { program } : {}),
         ...(major !== undefined ? { major } : {}),
-        ...(interest_tags !== undefined ? { interest_tags } : {})
+        ...(interest_tags !== undefined ? { interest_tags } : {}),
+        ...(receive_comment_emails !== undefined ? { receive_comment_emails } : {})
       },
       { new: true }
     )
-      .select("username age school program major is_verified interest_tags")
+      .select("username age school program major is_verified interest_tags receive_comment_emails")
       .lean();
     return res.json({ uid: req.user.uid, ...updated });
   } catch (error) {
