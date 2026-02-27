@@ -78,3 +78,7 @@ Set environment variables:
 - Use your frontend production URL as the public site.
 - Ensure backend `ALLOWED_ORIGINS` includes that exact URL.
 - If you update domains, redeploy both sides with matching env vars.
+
+## Acknowledgements
+The initial idea was developed during a hackathon collaboration with @jl205-maker, Suosi He, Zihan Zhu. 
+This version has been fully redesigned and implemented independently.
