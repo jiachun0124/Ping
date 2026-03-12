@@ -5,6 +5,9 @@ const config = {
   port: Number(process.env.PORT || 4000),
   mongoUri: process.env.MONGODB_URI || process.env.DATABASE_URL,
   sessionSecret: process.env.SESSION_SECRET || "dev_secret_change_me",
+  sessionTtlSeconds: Number(process.env.SESSION_TTL_SECONDS || 60 * 60 * 24 * 7),
+  redisUrl: process.env.REDIS_URL || "",
+  redisSessionPrefix: process.env.REDIS_SESSION_PREFIX || "ping:sess:",
   allowedOrigins: (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
     .split(",")
     .map((value) => value.trim())
@@ -23,7 +26,8 @@ const config = {
   smtpUser: process.env.SMTP_USER || "",
   smtpPass: process.env.SMTP_PASS || "",
   smtpFrom: process.env.SMTP_FROM || "",
-  smtpSecure: process.env.SMTP_SECURE === "true"
+  smtpSecure: process.env.SMTP_SECURE === "true",
+  isLambdaRuntime: Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME)
 };
 
 if (!config.mongoUri) {

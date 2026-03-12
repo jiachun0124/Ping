@@ -43,27 +43,35 @@ router.get("/", async (req, res, next) => {
       },
       { $unwind: { path: "$creator", preserveNullAndEmptyArrays: true } }
     ]);
-    const mapped = await Promise.all(
-      items.map(async (event) => {
-        const going = await EventJoin.countDocuments({ event_id: event._id });
-        return {
-          event_id: event._id.toString(),
-          title: event.title,
-          creator_username: event.creator?.username || null,
-          description: event.description,
-          category: event.category,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          status: event.status,
-          place_name: event.place_name,
-          lat: event.lat,
-          lng: event.lng,
-          distance_m: event.distance_m,
-          ttl_minutes: Math.max(0, Math.floor((event.end_time - now) / 60000)),
-          counts: { going }
-        };
-      })
+
+    const eventIds = items.map((event) => event._id);
+    const goingCountsRaw = eventIds.length
+      ? await EventJoin.aggregate([
+          { $match: { event_id: { $in: eventIds } } },
+          { $group: { _id: "$event_id", going: { $sum: 1 } } }
+        ])
+      : [];
+    const goingCountMap = new Map(
+      goingCountsRaw.map((row) => [row._id.toString(), row.going])
     );
+
+    const mapped = items.map((event) => ({
+      event_id: event._id.toString(),
+      title: event.title,
+      creator_username: event.creator?.username || null,
+      description: event.description,
+      category: event.category,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      status: event.status,
+      place_name: event.place_name,
+      lat: event.lat,
+      lng: event.lng,
+      distance_m: event.distance_m,
+      ttl_minutes: Math.max(0, Math.floor((event.end_time - now) / 60000)),
+      counts: { going: goingCountMap.get(event._id.toString()) || 0 }
+    }));
+
     return res.json({ items: mapped, next_cursor: null, applied: { radius_m: radiusM } });
   } catch (error) {
     return next(error);

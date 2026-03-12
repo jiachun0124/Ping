@@ -1,0 +1,46 @@
+service: ping-backend
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  timeout: 29
+  memorySize: 512
+  environment:
+    NODE_ENV: production
+    MONGODB_URI: ${env:MONGODB_URI}
+    SESSION_SECRET: ${env:SESSION_SECRET}
+    SESSION_TTL_SECONDS: ${env:SESSION_TTL_SECONDS, '604800'}
+    REDIS_URL: ${env:REDIS_URL}
+    REDIS_SESSION_PREFIX: ${env:REDIS_SESSION_PREFIX, 'ping:sess:'}
+    ALLOWED_ORIGINS: ${env:ALLOWED_ORIGINS}
+    FRONTEND_URL: ${env:FRONTEND_URL}
+    HOST: 0.0.0.0
+    GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID, ''}
+    GOOGLE_CLIENT_SECRET: ${env:GOOGLE_CLIENT_SECRET, ''}
+    GOOGLE_CALLBACK_URL: ${env:GOOGLE_CALLBACK_URL, ''}
+    SMTP_HOST: ${env:SMTP_HOST, ''}
+    SMTP_PORT: ${env:SMTP_PORT, '587'}
+    SMTP_USER: ${env:SMTP_USER, ''}
+    SMTP_PASS: ${env:SMTP_PASS, ''}
+    SMTP_FROM: ${env:SMTP_FROM, ''}
+    SMTP_SECURE: ${env:SMTP_SECURE, 'false'}
+
+functions:
+  api:
+    handler: src/lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: ANY
+
+package:
+  patterns:
+    - "!**/*.md"
+    - "!sql/**"
+

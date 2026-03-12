@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader } from "@react-google-maps/api";
 import {
   loadEventDraftById,
   removeEventDraft,
@@ -14,7 +14,8 @@ const CreateEventPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    libraries: ["marker"]
   });
   const draftId = location.state?.draftId || null;
   const initialDraft = draftId ? loadEventDraftById(user?.uid, draftId) : null;
@@ -30,6 +31,9 @@ const CreateEventPage = () => {
     }
   );
   const [status, setStatus] = useState("");
+  const [map, setMap] = useState(null);
+  const advancedMarkerRef = useRef(null);
+  const mapId = import.meta.env.VITE_GOOGLE_MAP_ID || "DEMO_MAP_ID";
 
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
@@ -106,6 +110,38 @@ const CreateEventPage = () => {
     () => ({ lat: Number(form.lat), lng: Number(form.lng) }),
     [form.lat, form.lng]
   );
+
+  useEffect(() => {
+    if (!isLoaded || !map || !window.google?.maps?.marker?.AdvancedMarkerElement) {
+      return;
+    }
+    const markerNode = document.createElement("div");
+    markerNode.style.width = "16px";
+    markerNode.style.height = "16px";
+    markerNode.style.borderRadius = "50%";
+    markerNode.style.background = "#2563eb";
+    markerNode.style.border = "1px solid rgba(15, 23, 42, 0.35)";
+    markerNode.style.boxSizing = "border-box";
+    const marker = new window.google.maps.marker.AdvancedMarkerElement({
+      map,
+      position: mapCenter,
+      content: markerNode
+    });
+    advancedMarkerRef.current = marker;
+    return () => {
+      marker.map = null;
+      advancedMarkerRef.current = null;
+    };
+  }, [isLoaded, map]);
+
+  useEffect(() => {
+    if (advancedMarkerRef.current) {
+      advancedMarkerRef.current.position = mapCenter;
+      if (map) {
+        map.panTo(mapCenter);
+      }
+    }
+  }, [mapCenter, map]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -242,10 +278,10 @@ const CreateEventPage = () => {
                   zoom={15}
                   center={mapCenter}
                   mapContainerStyle={{ width: "100%", height: "100%" }}
-                  options={{ streetViewControl: false, mapTypeControl: false }}
-                >
-                  <Marker position={mapCenter} />
-                </GoogleMap>
+                  options={{ streetViewControl: false, mapTypeControl: false, mapId }}
+                  onLoad={setMap}
+                  onUnmount={() => setMap(null)}
+                />
               ) : (
                 <div className="h-full flex items-center justify-center text-sm text-slate-500">
                   Loading map...
