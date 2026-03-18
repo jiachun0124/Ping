@@ -32,6 +32,7 @@ This document captures the current implementation design in this repository and 
 - **Backend**: Node.js + Express API (`backend/`)
   - REST endpoints for auth, profile, events, discovery, map points
   - Session-based auth using `express-session` + Passport
+  - Optional Redis-backed session store for distributed runtimes
 - **Database**: MongoDB with Mongoose models
   - Geo queries through `2dsphere` index on event location
 - **Optional Email**: SMTP via Nodemailer for delayed comment notifications
@@ -193,7 +194,7 @@ This document captures the current implementation design in this repository and 
 ### 9.1 Recommended Split
 
 - Frontend: Vercel (`frontend/`)
-- Backend: Render or Railway (`backend/`)
+- Backend: AWS Lambda via Serverless (`backend/serverless.yml`)
 - DB: MongoDB Atlas
 
 ### 9.2 Important Environment Variables
@@ -201,9 +202,14 @@ This document captures the current implementation design in this repository and 
 - Shared/runtime:
   - `MONGODB_URI`
   - `SESSION_SECRET`
+  - `SESSION_TTL_SECONDS`
   - `ALLOWED_ORIGINS`
   - `FRONTEND_URL`
   - `NODE_ENV`
+  - `HOST`
+- Session store (optional for long-running servers, required for Lambda):
+  - `REDIS_URL`
+  - `REDIS_SESSION_PREFIX`
 - Frontend:
   - `VITE_API_BASE_URL`
   - `VITE_GOOGLE_MAPS_API_KEY`
@@ -214,6 +220,7 @@ This document captures the current implementation design in this repository and 
 ## 10. Security and Reliability Notes
 
 - Session cookie settings are production-aware for cross-site deployments.
+- Sessions can be externalized to Redis (`connect-redis`) for better resilience across restarts/instances.
 - Protected mutation endpoints rely on `requireAuth` + selective `requireVerified`.
 - Input validation exists for core required fields and enum categories, but is not yet centralized.
 - Error handling uses a generic 500 fallback; no structured error codes or tracing yet.
@@ -230,7 +237,7 @@ This document captures the current implementation design in this repository and 
 
 - Add request schema validation layer (e.g., Zod/Joi) for consistent API contracts.
 - Move delayed notification logic to durable job queue (BullMQ/SQS/Cloud Tasks).
-- Add Redis-backed session store for horizontal scale.
+- Add a fallback strategy for degraded Redis/session-store outages.
 - Add endpoint-level rate limiting and audit logging.
 - Introduce integration tests for auth, event CRUD, and geo endpoints.
 - Build moderation/reporting workflows and admin tooling.
