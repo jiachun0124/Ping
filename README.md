@@ -41,44 +41,19 @@ Open `http://localhost:5173`.
 
 ## Notes
 
-- Dev login is enabled via `/auth/dev`. Use a `.edu` email to be verified.
-- Google OAuth routes are stubbed for now.
+- The frontend login page uses Google OAuth via `GET /auth/google`.
+- Dev login is still available at `POST /auth/dev` when `DEV_AUTH_ENABLED=true` (useful for local API testing).
+- `REDIS_URL` is optional for local development (in-memory sessions are used when omitted), but required for AWS Lambda deployments.
 
 ## Deploy (Public Web App)
 
 Recommended setup:
 
 - Frontend: Vercel
-- Backend API: Render (or Railway)
+- Backend API: AWS Lambda + API Gateway
 - Database: MongoDB Atlas
 
-### 1) Deploy backend API
-
-Create a Web Service from `backend/` with:
-
-- Build command: `npm install`
-- Start command: `npm start`
-
-Set environment variables:
-
-- `NODE_ENV=production`
-- `PORT=4000`
-- `MONGODB_URI=<your mongodb atlas uri>`
-- `SESSION_SECRET=<strong random secret>`
-- `SESSION_TTL_SECONDS=604800`
-- `REDIS_URL=<your redis connection url>`
-- `REDIS_SESSION_PREFIX=ping:sess:`
-- `ALLOWED_ORIGINS=https://<your-frontend-domain>`
-- `FRONTEND_URL=https://<your-frontend-domain>`
-- `HOST=0.0.0.0`
-- (optional) Google OAuth values if used:
-  - `GOOGLE_CLIENT_ID`
-  - `GOOGLE_CLIENT_SECRET`
-  - `GOOGLE_CALLBACK_URL=https://<your-backend-domain>/auth/google/callback`
-
-After deploy, verify `https://<your-backend-domain>/health` returns `{ "ok": true }`.
-
-### Optional: AWS Lambda backend
+### 1) Deploy backend API (AWS Lambda)
 
 If deploying the backend to Lambda, use `backend/src/lambda.handler` as the
 function entrypoint and keep Redis sessions enabled (`REDIS_URL` required).
@@ -89,11 +64,23 @@ Quick deploy with Serverless Framework:
   - `cd backend`
   - `npm install`
 2. Export required environment variables in your shell (or set in CI):
-  - `MONGODB_URI`, `SESSION_SECRET`, `REDIS_URL`, `ALLOWED_ORIGINS`, `FRONTEND_URL`
+  - `NODE_ENV=production`
+  - `MONGODB_URI=<your mongodb atlas uri>`
+  - `SESSION_SECRET=<strong random secret>`
+  - `SESSION_TTL_SECONDS=604800`
+  - `REDIS_URL=<your redis connection url>`
+  - `REDIS_SESSION_PREFIX=ping:sess:`
+  - `ALLOWED_ORIGINS=https://<your-frontend-domain>`
+  - `FRONTEND_URL=https://<your-frontend-domain>`
+  - (optional) Google OAuth values if used:
+    - `GOOGLE_CLIENT_ID`
+    - `GOOGLE_CLIENT_SECRET`
+    - `GOOGLE_CALLBACK_URL=https://<your-backend-domain>/auth/google/callback`
 3. Deploy:
   - `npm run deploy:lambda -- --stage prod --region us-east-1`
 4. Use the printed API Gateway URL as your backend URL.
-5. Update frontend `VITE_API_BASE_URL` to that URL and redeploy frontend.
+5. Verify `https://<your-backend-domain>/health` returns `{ "ok": true }`.
+6. Update frontend `VITE_API_BASE_URL` to that URL and redeploy frontend.
 
 ### 2) Deploy frontend
 

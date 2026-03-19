@@ -47,11 +47,16 @@ router.get(
   passport.authenticate("google", {
     failureRedirect: `${config.frontendUrl}/login?error=oauth`
   }),
-  (req, res) => {
+  (req, res, next) => {
     if (req.user?._id) {
       req.session.userId = req.user._id.toString();
     }
-    return res.redirect(`${config.frontendUrl}/map`);
+    req.session.save((error) => {
+      if (error) {
+        return next(error);
+      }
+      return res.redirect(`${config.frontendUrl}/map`);
+    });
   }
 );
 
@@ -66,7 +71,12 @@ router.post("/dev", async (req, res, next) => {
   try {
     const user = await findOrCreateUser({ email, username });
     req.session.userId = user._id ? user._id.toString() : user.uid;
-    return res.json({ user: buildUserResponse(user) });
+    req.session.save((error) => {
+      if (error) {
+        return next(error);
+      }
+      return res.json({ user: buildUserResponse(user) });
+    });
   } catch (error) {
     return next(error);
   }
