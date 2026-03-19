@@ -1,10 +1,22 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const AUTH_TOKEN_STORAGE_KEY = "ping.authToken";
+
+export const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
+export const setAuthToken = (token) => {
+  if (!token) return;
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+};
+export const clearAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+};
 
 export const request = async (path, options = {}) => {
+  const authToken = getAuthToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(options.headers || {})
     },
     ...options
@@ -13,7 +25,9 @@ export const request = async (path, options = {}) => {
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const message = errorBody.error || "Request failed";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();

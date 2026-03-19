@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client.js";
+import { api, clearAuthToken, setAuthToken } from "../api/client.js";
 
 const AuthContext = createContext(null);
 
@@ -12,6 +12,9 @@ export const AuthProvider = ({ children }) => {
       const data = await api.authMe();
       setUser(data);
     } catch (error) {
+      if (error?.status === 401) {
+        clearAuthToken();
+      }
       setUser(null);
     } finally {
       setLoading(false);
@@ -19,6 +22,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    const currentUrl = new URL(window.location.href);
+    const authToken = currentUrl.searchParams.get("auth_token");
+    if (authToken) {
+      setAuthToken(authToken);
+      currentUrl.searchParams.delete("auth_token");
+      window.history.replaceState(
+        {},
+        document.title,
+        `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`
+      );
+    }
     refresh();
   }, []);
 

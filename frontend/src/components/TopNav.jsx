@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { api } from "../api/client.js";
+import { api, clearAuthToken } from "../api/client.js";
 
 const TopNav = () => {
   const { user, setUser } = useAuth();
@@ -11,6 +11,7 @@ const TopNav = () => {
     try {
       await api.logout();
     } finally {
+      clearAuthToken();
       setUser(null);
       navigate("/login");
     }

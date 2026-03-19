@@ -1,9 +1,18 @@
 const express = require("express");
 const User = require("../models/User");
 const passport = require("../auth/passport");
+const { createAuthToken, verifyAuthToken } = require("../auth/token");
 const config = require("../config");
 
 const router = express.Router();
+
+const getBearerToken = (req) => {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) {
+    return "";
+  }
+  return header.slice("Bearer ".length).trim();
+};
 
 const buildUserResponse = (user) => ({
   uid: user._id.toString(),
@@ -48,14 +57,21 @@ router.get(
     failureRedirect: `${config.frontendUrl}/login?error=oauth`
   }),
   (req, res, next) => {
+    const uid = req.user?._id?.toString();
+    const authToken = uid ? createAuthToken(uid) : null;
+
     if (req.user?._id) {
-      req.session.userId = req.user._id.toString();
+      req.session.userId = uid;
     }
     req.session.save((error) => {
       if (error) {
         return next(error);
       }
-      return res.redirect(`${config.frontendUrl}/map`);
+      const redirectUrl = new URL(`${config.frontendUrl}/map`);
+      if (authToken) {
+        redirectUrl.searchParams.set("auth_token", authToken);
+      }
+      return res.redirect(redirectUrl.toString());
     });
   }
 );
@@ -70,12 +86,14 @@ router.post("/dev", async (req, res, next) => {
   }
   try {
     const user = await findOrCreateUser({ email, username });
-    req.session.userId = user._id ? user._id.toString() : user.uid;
+    const uid = user._id ? user._id.toString() : user.uid;
+    const authToken = createAuthToken(uid);
+    req.session.userId = uid;
     req.session.save((error) => {
       if (error) {
         return next(error);
       }
-      return res.json({ user: buildUserResponse(user) });
+      return res.json({ user: buildUserResponse(user), auth_token: authToken });
     });
   } catch (error) {
     return next(error);
@@ -83,11 +101,15 @@ router.post("/dev", async (req, res, next) => {
 });
 
 router.get("/me", async (req, res, next) => {
-  if (!req.session.userId) {
+  const bearerToken = getBearerToken(req);
+  const tokenUserId = verifyAuthToken(bearerToken);
+  const userId = req.session.userId || tokenUserId;
+
+  if (!userId) {
     return res.status(401).json({ error: "Not authenticated" });
   }
   try {
-    const user = await User.findById(req.session.userId).lean();
+    const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
