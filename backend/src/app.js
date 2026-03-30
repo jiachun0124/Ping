@@ -50,6 +50,19 @@ const createApp = async () => {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  app.use((req, res, next) => {
+    const start = Date.now();
+
+    res.on("finish", () => {
+      const latencyMs = Date.now() - start;
+      console.log(
+        `[API latency] ${req.method} ${req.originalUrl} -> ${latencyMs}ms`
+      );
+    });
+
+    next();
+  });
+
   app.get("/health", (req, res) => {
     res.json({ ok: true });
   });
