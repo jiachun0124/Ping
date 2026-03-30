@@ -1,7 +1,10 @@
 require("dotenv").config();
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const isProduction = nodeEnv === "production";
+
 const config = {
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv,
   port: Number(process.env.PORT || 4000),
   mongoUri: process.env.MONGODB_URI || process.env.DATABASE_URL,
   sessionSecret: process.env.SESSION_SECRET || "dev_secret_change_me",
@@ -14,11 +17,17 @@ const config = {
     .filter(Boolean),
   devLoginEmail: process.env.DEV_LOGIN_EMAIL || "demo@upenn.edu",
   devAuthEnabled: process.env.DEV_AUTH_ENABLED !== "false",
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  frontendUrl:
+    (isProduction ? process.env.FRONTEND_URL_PROD : process.env.FRONTEND_URL_DEV) ||
+    process.env.FRONTEND_URL ||
+    "http://localhost:5173",
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   googleCallbackUrl:
+    (isProduction
+      ? process.env.GOOGLE_CALLBACK_URL_PROD
+      : process.env.GOOGLE_CALLBACK_URL_DEV) ||
     process.env.GOOGLE_CALLBACK_URL ||
     "http://127.0.0.1:4000/auth/google/callback",
   smtpHost: process.env.SMTP_HOST || "",
@@ -34,6 +43,6 @@ if (!config.mongoUri) {
   throw new Error("MONGODB_URI is required");
 }
 
-config.isProduction = config.nodeEnv === "production";
+config.isProduction = isProduction;
 
 module.exports = config;
